@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Watchlist</title>
+<style>
+  :root {
+    --bg: #10141B; --panel: #171C25; --border: #2A313D; --hairline: #242B36;
+    --ink: #E9E6DE; --ink-dim: #8B93A1; --ink-faint: #5A6270;
+    --gold: #C9A227; --buy: #5B8DEF; --buyzone: #4FB0C6; --hold: #8B93A1;
+    --trim: #4C9A6A; --bought: #E15252;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  .display { font-family: Georgia, 'Times New Roman', serif; }
+  .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+  .header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 4px; }
+  .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 4px; color: var(--gold); }
+  h1 { font-size: 30px; margin: 0; font-weight: 600; }
+  .header-btns { display: flex; align-items: center; gap: 8px; }
+  button { cursor: pointer; font-family: inherit; }
+  .btn-ghost { border-radius: 6px; padding: 8px 12px; font-size: 14px; font-weight: 500; background: transparent; color: var(--ink-dim); border: 1px solid var(--border); }
+  .btn-gold { border-radius: 6px; padding: 8px 12px; font-size: 14px; font-weight: 500; background: var(--gold); color: var(--bg); border: none; }
+  .btn-ink { border-radius: 6px; padding: 8px 10px; font-size: 13px; font-weight: 500; background: var(--ink); color: var(--bg); border: none; }
+  .btn-gold-sm { border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 500; background: var(--gold); color: var(--bg); border: none; }
+  .btn-gold-sm:disabled { opacity: 0.4; cursor: default; }
+  .hr { height: 1px; width: 100%; margin-bottom: 24px; background: var(--border); }
+  .panel { margin-bottom: 24px; border-radius: 8px; padding: 16px; background: var(--panel); border: 1px solid var(--border); }
+  .label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint); margin-bottom: 4px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  input, textarea {
+    width: 100%; border-radius: 6px; padding: 7px 9px; font-size: 14px; outline: none;
+    background: var(--bg); border: 1px solid var(--border); color: var(--ink);
+  }
+  input:focus, textarea:focus { border-color: var(--gold); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .span2 { grid-column: 1 / -1; }
+  .err { font-size: 12px; margin-bottom: 8px; color: #E07A5F; }
+  .hint { font-size: 10px; margin-bottom: 12px; color: var(--ink-faint); }
+  .empty { border-radius: 8px; padding: 32px; text-align: center; background: var(--panel); border: 1px dashed var(--border); }
+  .empty-title { font-size: 14px; margin-bottom: 4px; }
+  .empty-sub { font-size: 12px; color: var(--ink-faint); }
+  .card { border-radius: 8px; padding: 16px; background: var(--panel); border: 1px solid var(--border); margin-bottom: 12px; }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .ticker-row { display: flex; align-items: baseline; gap: 10px; }
+  .ticker { font-size: 20px; font-weight: 600; }
+  .zone-tag { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; }
+  .del-btn { background: none; border: none; opacity: 0.4; color: var(--ink-dim); font-size: 15px; }
+  .del-btn:hover { opacity: 1; }
+  .gauge { position: relative; width: 100%; padding-top: 20px; padding-bottom: 24px; }
+  .track { position: relative; height: 8px; border-radius: 999px; overflow: hidden; background: var(--hairline); }
+  .seg { position: absolute; top: 0; height: 100%; }
+  .tick { position: absolute; top: 20px; transform: translateX(-50%); text-align: center; }
+  .tick-line { width: 1px; height: 8px; margin: 0 auto; background: var(--border); }
+  .tick-label { margin-top: 4px; white-space: nowrap; font-size: 10px; color: var(--ink-faint); }
+  .bought-marker { position: absolute; top: 0; transform: translateX(-50%); z-index: 10; text-align: center; }
+  .bought-line { width: 2px; height: 30px; background: var(--bought); margin: 0 auto; }
+  .bought-label { margin-top: 2px; font-size: 9px; color: var(--bought); white-space: nowrap; }
+  .price-marker { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+  .price-pill { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; background: var(--ink); color: var(--bg); }
+  .price-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--bg); }
+  .card-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .price-link { display: flex; align-items: center; gap: 6px; font-size: 12px; background: none; border: none; color: var(--ink-dim); }
+  .price-edit { display: flex; align-items: center; gap: 8px; }
+  .price-edit input { width: 96px; padding: 4px 8px; border-color: var(--gold); }
+  .footnote { margin-top: 32px; font-size: 11px; line-height: 1.6; color: var(--ink-faint); }
+  .loading { font-size: 14px; color: var(--ink-dim); }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+
+<script>
+const STORAGE_KEY = "watchlist-entries-v1";
+
+const HEX = {
+  buy: "#5B8DEF", buyzone: "#4FB0C6", hold: "#8B93A1", trim: "#4C9A6A",
+};
+
+const state = {
+  entries: [],
+  showForm: false,
+  showBackup: false,
+  editingPriceId: null,
+  priceDraft: "",
+  error: "",
+  importText: "",
+  importError: "",
+  copyStatus: "",
+  draft: { ticker: "", buyBelow: "", buyZoneTop: "", holdLow: "", holdHigh: "", trimAbove: "", currentPrice: "", boughtAt: "" },
+};
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state.entries = JSON.parse(raw);
+  } catch (e) { /* nothing saved yet */ }
+}
+
+function persist(next) {
+  state.entries = next;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch (e) {
+    state.error = "Couldn't save to this browser's storage.";
+  }
+  render();
+}
+
+function fmt(n) {
+  if (isNaN(n)) return "—";
+  return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function hasBuyZone(entry) {
+  return entry.buyZoneTop !== "" && entry.buyZoneTop !== undefined && !isNaN(parseFloat(entry.buyZoneTop));
+}
+
+function zoneOf(entry) {
+  const p = parseFloat(entry.currentPrice);
+  const buyBelow = parseFloat(entry.buyBelow);
+  const holdLow = parseFloat(entry.holdLow);
+  const holdHigh = parseFloat(entry.holdHigh);
+  const trimAbove = parseFloat(entry.trimAbove);
+  const buyZoneTop = hasBuyZone(entry) ? parseFloat(entry.buyZoneTop) : null;
+
+  if (isNaN(p)) return { label: "No price yet", color: "#5A6270" };
+  if (p < buyBelow) return { label: "Aggressive Buy", color: HEX.buy };
+  if (buyZoneTop !== null && p >= buyBelow && p < buyZoneTop) return { label: "Buy", color: HEX.buyzone };
+  if (p >= holdLow && p <= holdHigh) return { label: "Hold", color: HEX.hold };
+  if (p > trimAbove) return { label: "Trim", color: HEX.trim };
+  const buyGapTop = buyZoneTop !== null ? buyZoneTop : buyBelow;
+  if (p >= buyGapTop && p < holdLow) return { label: "Between buy & hold", color: "#B08A2E" };
+  if (p > holdHigh && p <= trimAbove) return { label: "Between hold & trim", color: "#3F8A6A" };
+  return { label: "—", color: "#5A6270" };
+}
+
+function gaugeHTML(entry) {
+  const buyBelow = parseFloat(entry.buyBelow);
+  const holdLow = parseFloat(entry.holdLow);
+  const holdHigh = parseFloat(entry.holdHigh);
+  const trimAbove = parseFloat(entry.trimAbove);
+  const p = parseFloat(entry.currentPrice);
+  const buyZoneTop = hasBuyZone(entry) ? parseFloat(entry.buyZoneTop) : null;
+  const boughtAt = entry.boughtAt !== "" && entry.boughtAt !== undefined ? parseFloat(entry.boughtAt) : null;
+
+  const span = trimAbove - buyBelow;
+  const pad = span > 0 ? span * 0.18 : Math.max(buyBelow * 0.1, 1);
+  const min = buyBelow - pad;
+  const max = trimAbove + pad;
+  const range = max - min || 1;
+  const pct = (v) => Math.min(100, Math.max(0, ((v - min) / range) * 100));
+
+  const buyPct = pct(buyBelow);
+  const buyZoneTopPct = buyZoneTop !== null ? pct(buyZoneTop) : null;
+  const holdLowPct = pct(holdLow);
+  const holdHighPct = pct(holdHigh);
+  const trimPct = pct(trimAbove);
+  const markerPct = isNaN(p) ? null : pct(p);
+  const boughtPct = boughtAt !== null && !isNaN(boughtAt) ? pct(boughtAt) : null;
+  const buyZoneEndPct = buyZoneTopPct !== null ? buyZoneTopPct : holdLowPct;
+
+  let ticks = [{ at: buyPct, label: `&lt;${fmt(buyBelow)}` }];
+  if (buyZoneTopPct !== null) ticks.push({ at: buyZoneTopPct, label: fmt(buyZoneTop) });
+  ticks.push({ at: holdLowPct, label: fmt(holdLow) });
+  ticks.push({ at: holdHighPct, label: fmt(holdHigh) });
+  ticks.push({ at: trimPct, label: `&gt;${fmt(trimAbove)}` });
+
+  return `
+    <div class="gauge">
+      <div class="track">
+        <div class="seg" style="left:0%; width:${buyPct}%; background:${HEX.buy}55"></div>
+        ${buyZoneTopPct !== null ? `<div class="seg" style="left:${buyPct}%; width:${Math.max(0, buyZoneEndPct - buyPct)}%; background:${HEX.buyzone}55"></div>` : ""}
+        <div class="seg" style="left:${holdLowPct}%; width:${Math.max(0, holdHighPct - holdLowPct)}%; background:${HEX.hold}55"></div>
+        <div class="seg" style="left:${trimPct}%; width:${Math.max(0, 100 - trimPct)}%; background:${HEX.trim}55"></div>
+      </div>
+      ${ticks.map((t) => `
+        <div class="tick" style="left:${t.at}%">
+          <div class="tick-line"></div>
+          <div class="tick-label mono">${t.label}</div>
+        </div>`).join("")}
+      ${boughtPct !== null && !isNaN(boughtPct) ? `
+        <div class="bought-marker" style="left:${boughtPct}%" title="Bought at ${fmt(boughtAt)}">
+          <div class="bought-line"></div>
+          <div class="bought-label mono">bought</div>
+        </div>` : ""}
+      ${markerPct !== null ? `
+        <div class="price-marker" style="left:${markerPct}%">
+          <div class="price-pill mono">${fmt(p)}</div>
+          <div class="price-dot"></div>
+        </div>` : ""}
+    </div>`;
+}
+
+function daysAgo(iso) {
+  if (!iso) return null;
+  const diff = Date.now() - new Date(iso).getTime();
+  const d = Math.floor(diff / 86400000);
+  if (d === 0) return "today";
+  if (d === 1) return "1 day ago";
+  return `${d} days ago`;
+}
+
+function numField(id, label, value, placeholder, span2) {
+  return `
+    <label class="field ${span2 ? "span2" : ""}">
+      <span class="label">${label}</span>
+      <input class="mono" type="number" inputmode="decimal" id="${id}" value="${esc(value)}" placeholder="${placeholder}" oninput="updateDraft('${id.replace('draft-', '')}', this.value)" />
+    </label>`;
+}
+
+function render() {
+  const root = document.getElementById("root");
+  const d = state.draft;
+
+  root.innerHTML = `
+    <div class="header">
+      <div>
+        <div class="eyebrow">Investor Club</div>
+        <h1 class="display">Watchlist</h1>
+      </div>
+      <div class="header-btns">
+        <button class="btn-ghost" onclick="toggleBackup()">Backup</button>
+        <button class="btn-gold" onclick="toggleForm()">${state.showForm ? "Cancel" : "+ Add stock"}</button>
+      </div>
+    </div>
+    <div class="hr"></div>
+
+    ${state.showBackup ? `
+      <div class="panel">
+        <div class="label">Your data, as text — copy and save it somewhere safe</div>
+        <textarea class="mono" id="backup-text" readonly rows="6" onfocus="this.select()">${esc(JSON.stringify(state.entries, null, 2))}</textarea>
+        <div style="margin-top:8px; margin-bottom:16px;">
+          <button class="btn-ink" onclick="copyBackup()">${state.copyStatus || "Copy to clipboard"}</button>
+        </div>
+        <div class="label">Restore from a backup</div>
+        <textarea class="mono" id="import-text" rows="4" placeholder="Paste backup text here" oninput="state.importText=this.value">${esc(state.importText)}</textarea>
+        ${state.importError ? `<div class="err" style="margin-top:8px">${esc(state.importError)}</div>` : ""}
+        <div style="margin-top:8px;">
+          <button class="btn-gold-sm" ${state.importText.trim() ? "" : "disabled"} onclick="restoreBackup()">Restore this list</button>
+        </div>
+      </div>` : ""}
+
+    ${state.showForm ? `
+      <div class="panel">
+        <div class="grid2">
+          <label class="field span2">
+            <span class="label">Ticker</span>
+            <input class="mono" type="text" style="text-transform:uppercase" id="draft-ticker" value="${esc(d.ticker)}" placeholder="e.g. AAPL" oninput="updateDraft('ticker', this.value)" />
+          </label>
+          ${numField("draft-buyBelow", "Aggressive buy (below)", d.buyBelow, "0.00")}
+          ${numField("draft-buyZoneTop", "Buy zone top (optional)", d.buyZoneTop, "skip if none")}
+          ${numField("draft-holdLow", "Hold range — low", d.holdLow, "0.00")}
+          ${numField("draft-holdHigh", "Hold range — high", d.holdHigh, "0.00")}
+          ${numField("draft-trimAbove", "Trim (above)", d.trimAbove, "0.00")}
+          ${numField("draft-currentPrice", "Current price (optional)", d.currentPrice, "0.00")}
+          ${numField("draft-boughtAt", "Bought at (optional)", d.boughtAt, "your entry price")}
+        </div>
+        <div class="hint">Leave "Buy zone top" blank for stocks that go straight from aggressive buy to hold.</div>
+        ${state.error ? `<div class="err">${esc(state.error)}</div>` : ""}
+        <button class="btn-ink" style="width:100%; padding:10px;" onclick="addEntry()">Save stock</button>
+      </div>` : ""}
+
+    ${state.entries.length === 0 ? `
+      <div class="empty">
+        <div class="empty-title">Nothing on the list yet.</div>
+        <div class="empty-sub">Add a stock with the levels from your investor club to start tracking it.</div>
+      </div>` : state.entries.map((entry) => {
+        const zone = zoneOf(entry);
+        const ago = daysAgo(entry.updatedAt);
+        return `
+        <div class="card">
+          <div class="card-top">
+            <div class="ticker-row">
+              <span class="ticker display">${esc(entry.ticker)}</span>
+              <span class="zone-tag" style="color:${zone.color}; background:${zone.color}1F">${zone.label}</span>
+            </div>
+            <button class="del-btn" onclick="removeEntry('${entry.id}')">✕</button>
+          </div>
+          ${gaugeHTML(entry)}
+          <div class="card-bottom">
+            ${state.editingPriceId === entry.id ? `
+              <div class="price-edit">
+                <input class="mono" type="number" inputmode="decimal" id="price-edit-input" value="${esc(state.priceDraft)}"
+                  oninput="state.priceDraft=this.value" onkeydown="if(event.key==='Enter') savePrice('${entry.id}')" placeholder="new price" autofocus />
+                <button class="btn-gold-sm" onclick="savePrice('${entry.id}')">Save</button>
+              </div>` : `
+              <button class="price-link" onclick="startPriceEdit('${entry.id}')">⟳ ${ago ? `Price updated ${ago}` : "Set current price"}</button>`}
+          </div>
+        </div>`;
+      }).join("")}
+
+    <div class="footnote">This is a standalone version — your data lives in this browser's storage, on this device. It won't sync to other devices or browsers. Use the Backup button after adding stocks so you always have a copy saved elsewhere.</div>
+  `;
+
+  if (state.editingPriceId) {
+    const el = document.getElementById("price-edit-input");
+    if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }
+}
+
+function toggleForm() { state.showForm = !state.showForm; state.error = ""; render(); }
+function toggleBackup() { state.showBackup = !state.showBackup; render(); }
+
+function updateDraft(key, value) { state.draft[key] = value; }
+
+function resetDraft() {
+  state.draft = { ticker: "", buyBelow: "", buyZoneTop: "", holdLow: "", holdHigh: "", trimAbove: "", currentPrice: "", boughtAt: "" };
+  state.showForm = false;
+  state.error = "";
+}
+
+function addEntry() {
+  const d = state.draft;
+  const t = (d.ticker || "").trim().toUpperCase();
+  const buyBelow = parseFloat(d.buyBelow);
+  const holdLow = parseFloat(d.holdLow);
+  const holdHigh = parseFloat(d.holdHigh);
+  const trimAbove = parseFloat(d.trimAbove);
+  const buyZoneTop = d.buyZoneTop !== "" && d.buyZoneTop !== undefined ? parseFloat(d.buyZoneTop) : null;
+
+  if (!t) { state.error = "Enter a ticker."; render(); return; }
+  if ([buyBelow, holdLow, holdHigh, trimAbove].some((n) => isNaN(n))) { state.error = "Fill in all four price levels."; render(); return; }
+  if (!(buyBelow <= holdLow && holdLow <= holdHigh && holdHigh <= trimAbove)) { state.error = "Levels should run low to high: buy below → hold range → trim above."; render(); return; }
+  if (buyZoneTop !== null && !(buyBelow <= buyZoneTop && buyZoneTop <= holdLow)) { state.error = "Buy zone top should sit between the aggressive buy price and the hold range."; render(); return; }
+
+  const entry = {
+    id: `${t}-${Date.now()}`, ticker: t, buyBelow: d.buyBelow, buyZoneTop: d.buyZoneTop || "",
+    holdLow: d.holdLow, holdHigh: d.holdHigh, trimAbove: d.trimAbove,
+    currentPrice: d.currentPrice || "", boughtAt: d.boughtAt || "",
+    updatedAt: d.currentPrice ? new Date().toISOString() : null,
+  };
+  const next = [...state.entries, entry];
+  resetDraft();
+  persist(next);
+}
+
+function removeEntry(id) { persist(state.entries.filter((e) => e.id !== id)); }
+
+function startPriceEdit(id) {
+  const entry = state.entries.find((e) => e.id === id);
+  state.editingPriceId = id;
+  state.priceDraft = entry ? (entry.currentPrice || "") : "";
+  render();
+}
+
+function savePrice(id) {
+  const next = state.entries.map((e) => e.id === id ? { ...e, currentPrice: state.priceDraft, updatedAt: state.priceDraft ? new Date().toISOString() : null } : e);
+  state.editingPriceId = null;
+  persist(next);
+}
+
+async function copyBackup() {
+  const text = JSON.stringify(state.entries, null, 2);
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error("unavailable");
+    await navigator.clipboard.writeText(text);
+    state.copyStatus = "Copied";
+    render();
+    setTimeout(() => { state.copyStatus = ""; render(); }, 2000);
+  } catch (e) {
+    state.copyStatus = "Couldn't auto-copy — tap the box above, select all, then copy";
+    render();
+    setTimeout(() => { state.copyStatus = ""; render(); }, 4000);
+  }
+}
+
+function restoreBackup() {
+  try {
+    const parsed = JSON.parse(state.importText);
+    if (!Array.isArray(parsed)) throw new Error("not an array");
+    state.importText = "";
+    state.importError = "";
+    state.showBackup = false;
+    persist(parsed);
+  } catch (e) {
+    state.importError = "That doesn't look like valid backup text.";
+    render();
+  }
+}
+
+load();
+render();
+</script>
+</body>
+</html>
