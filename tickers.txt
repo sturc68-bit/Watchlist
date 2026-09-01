@@ -1,0 +1,23 @@
+# One ticker per line. Lines starting with # are ignored.
+# Edit this list to match the stocks on your dashboard.
+DLO
+CCJ
+DLR
+PAAS
+NU
+CF
+FNV
+WPM
+RGLD
+SIL
+CEG
+ACN
+FLUT
+CRM
+PFE
+PPTA
+MSFT
+ZTS
+GRAB
+BSX
+WSO

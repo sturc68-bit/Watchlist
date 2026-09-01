@@ -1,0 +1,36 @@
+name: Update stock prices
+
+on:
+  schedule:
+    # 21:30 UTC ≈ 4:30pm ET (adjust for daylight saving if you want exact
+    # timing — UTC offset shifts by an hour twice a year). Runs weekdays only.
+    - cron: "30 21 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch latest prices
+        env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+        run: python scripts/update_prices.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add prices.json
+          git diff --staged --quiet || git commit -m "Update prices"
+          git push

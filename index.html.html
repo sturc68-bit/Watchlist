@@ -84,6 +84,7 @@ const HEX = {
 
 const state = {
   entries: [],
+  autoPrices: {},
   showForm: false,
   showBackup: false,
   editingPriceId: null,
@@ -100,6 +101,32 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) state.entries = JSON.parse(raw);
   } catch (e) { /* nothing saved yet */ }
+}
+
+async function loadAutoPrices() {
+  try {
+    const res = await fetch("./prices.json", { cache: "no-store" });
+    if (res.ok) {
+      state.autoPrices = await res.json();
+      render();
+    }
+  } catch (e) {
+    // No prices.json yet, or opened as a local file — fine, manual entry still works.
+  }
+}
+
+// Resolves the price to actually use for an entry: a manual override
+// (entry.currentPrice) always wins over the automated daily price.
+function priceInfo(entry) {
+  const overrideVal = entry.currentPrice !== "" && entry.currentPrice !== undefined ? parseFloat(entry.currentPrice) : null;
+  if (overrideVal !== null && !isNaN(overrideVal)) {
+    return { value: overrideVal, source: "override", asOf: entry.updatedAt };
+  }
+  const auto = state.autoPrices[entry.ticker];
+  if (auto && typeof auto.price === "number") {
+    return { value: auto.price, source: "auto", asOf: auto.asOf };
+  }
+  return { value: NaN, source: "none", asOf: null };
 }
 
 function persist(next) {
@@ -126,7 +153,7 @@ function hasBuyZone(entry) {
 }
 
 function zoneOf(entry) {
-  const p = parseFloat(entry.currentPrice);
+  const p = priceInfo(entry).value;
   const buyBelow = parseFloat(entry.buyBelow);
   const holdLow = parseFloat(entry.holdLow);
   const holdHigh = parseFloat(entry.holdHigh);
@@ -149,7 +176,7 @@ function gaugeHTML(entry) {
   const holdLow = parseFloat(entry.holdLow);
   const holdHigh = parseFloat(entry.holdHigh);
   const trimAbove = parseFloat(entry.trimAbove);
-  const p = parseFloat(entry.currentPrice);
+  const p = priceInfo(entry).value;
   const buyZoneTop = hasBuyZone(entry) ? parseFloat(entry.buyZoneTop) : null;
   const boughtAt = entry.boughtAt !== "" && entry.boughtAt !== undefined ? parseFloat(entry.boughtAt) : null;
 
@@ -276,7 +303,8 @@ function render() {
         <div class="empty-sub">Add a stock with the levels from your investor club to start tracking it.</div>
       </div>` : state.entries.map((entry) => {
         const zone = zoneOf(entry);
-        const ago = daysAgo(entry.updatedAt);
+        const info = priceInfo(entry);
+        const ago = daysAgo(info.asOf);
         return `
         <div class="card">
           <div class="card-top">
@@ -291,15 +319,23 @@ function render() {
             ${state.editingPriceId === entry.id ? `
               <div class="price-edit">
                 <input class="mono" type="number" inputmode="decimal" id="price-edit-input" value="${esc(state.priceDraft)}"
-                  oninput="state.priceDraft=this.value" onkeydown="if(event.key==='Enter') savePrice('${entry.id}')" placeholder="new price" autofocus />
+                  oninput="state.priceDraft=this.value" onkeydown="if(event.key==='Enter') savePrice('${entry.id}')" placeholder="override price" autofocus />
                 <button class="btn-gold-sm" onclick="savePrice('${entry.id}')">Save</button>
+              </div>` : info.source === "override" ? `
+              <div class="price-link" style="gap:10px;">
+                <span>Override: ${fmt(info.value)}${ago ? ` (set ${ago})` : ""}</span>
+                <button class="price-link" style="padding:0;" onclick="clearOverride('${entry.id}')">Use auto price</button>
+              </div>` : info.source === "auto" ? `
+              <div class="price-link" style="gap:10px;">
+                <span>Auto: ${fmt(info.value)}${ago ? ` (as of ${ago})` : ""}</span>
+                <button class="price-link" style="padding:0;" onclick="startPriceEdit('${entry.id}')">Override</button>
               </div>` : `
-              <button class="price-link" onclick="startPriceEdit('${entry.id}')">⟳ ${ago ? `Price updated ${ago}` : "Set current price"}</button>`}
+              <button class="price-link" onclick="startPriceEdit('${entry.id}')">⟳ Set current price</button>`}
           </div>
         </div>`;
       }).join("")}
 
-    <div class="footnote">This is a standalone version — your data lives in this browser's storage, on this device. It won't sync to other devices or browsers. Use the Backup button after adding stocks so you always have a copy saved elsewhere.</div>
+    <div class="footnote">Prices update automatically once a day after market close, pulled from tickers.txt in your repo. Type your own price anytime to override it — an override always takes priority until you clear it. Your list itself lives in this browser's storage, on this device, so use the Backup button to keep a copy elsewhere.</div>
   `;
 
   if (state.editingPriceId) {
@@ -359,6 +395,11 @@ function savePrice(id) {
   persist(next);
 }
 
+function clearOverride(id) {
+  const next = state.entries.map((e) => e.id === id ? { ...e, currentPrice: "", updatedAt: null } : e);
+  persist(next);
+}
+
 async function copyBackup() {
   const text = JSON.stringify(state.entries, null, 2);
   try {
@@ -390,6 +431,7 @@ function restoreBackup() {
 
 load();
 render();
+loadAutoPrices();
 </script>
 </body>
 </html>
