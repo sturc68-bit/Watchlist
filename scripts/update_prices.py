@@ -8,12 +8,14 @@ Actions secret — see the workflow file).
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from urllib import request, parse, error
 
 API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
 TICKERS_FILE = "tickers.txt"
 OUTPUT_FILE = "prices.json"
+SECONDS_BETWEEN_REQUESTS = 8  # free tier allows ~8 requests/minute
 
 
 def load_tickers():
@@ -25,6 +27,26 @@ def load_tickers():
     return tickers
 
 
+def fetch_one(ticker, attempt=1):
+    url = "https://api.twelvedata.com/price?" + parse.urlencode({
+        "symbol": ticker,
+        "apikey": API_KEY,
+    })
+    try:
+        with request.urlopen(url, timeout=20) as resp:
+            return json.loads(resp.read().decode())
+    except error.HTTPError as e:
+        if e.code == 429 and attempt < 3:
+            print(f"Rate limited fetching {ticker}, waiting 20s and retrying...")
+            time.sleep(20)
+            return fetch_one(ticker, attempt + 1)
+        print(f"WARNING: HTTP error fetching {ticker}: {e}")
+        return None
+    except error.URLError as e:
+        print(f"WARNING: request failed for {ticker}: {e}")
+        return None
+
+
 def fetch_prices(tickers):
     if not tickers:
         return {}
@@ -32,29 +54,11 @@ def fetch_prices(tickers):
         print("ERROR: TWELVE_DATA_API_KEY is not set.", file=sys.stderr)
         sys.exit(1)
 
-    symbol_param = ",".join(tickers)
-    url = "https://api.twelvedata.com/price?" + parse.urlencode({
-        "symbol": symbol_param,
-        "apikey": API_KEY,
-    })
-
-    try:
-        with request.urlopen(url, timeout=20) as resp:
-            data = json.loads(resp.read().decode())
-    except error.URLError as e:
-        print(f"ERROR: request failed: {e}", file=sys.stderr)
-        sys.exit(1)
-
     results = {}
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    # Twelve Data returns a flat {"price": "..."} object when only one
-    # symbol was requested, or a dict keyed by symbol when multiple were.
-    if len(tickers) == 1:
-        data = {tickers[0]: data}
-
-    for ticker in tickers:
-        entry = data.get(ticker)
+    for i, ticker in enumerate(tickers):
+        entry = fetch_one(ticker)
         if isinstance(entry, dict) and "price" in entry:
             try:
                 results[ticker] = {
@@ -65,6 +69,9 @@ def fetch_prices(tickers):
                 print(f"WARNING: couldn't parse price for {ticker}: {entry}")
         else:
             print(f"WARNING: no price returned for {ticker}: {entry}")
+
+        if i < len(tickers) - 1:
+            time.sleep(SECONDS_BETWEEN_REQUESTS)
 
     return results
 
